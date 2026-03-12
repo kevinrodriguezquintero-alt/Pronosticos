@@ -1,16 +1,234 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="es">
 <head>
-    <title>Pronostico</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pronósticos de Ventas</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-
 <body>
-    <h1>Pronostico</h1>
-    <div>
+    <div class="dashboard-container">
+        <!-- Sidebar / Controls -->
+        <aside class="sidebar glass-panel">
+            <div class="logo-container">
+                <h2>📈 ForeCast Pro</h2>
+                <p>Análisis de Promedio Móvil</p>
+            </div>
+            
+            <form id="forecastForm">
+                <div class="input-group">
+                    <label for="producto">Seleccione el Producto:</label>
+                    <select id="producto" name="producto" required>
+                        <option value="" disabled selected>-- Elija un producto --</option>
+                        {% for prod in productos %}
+                        <option value="{{ prod }}">{{ prod }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
 
+                <div class="input-group">
+                    <label for="n_periods">Periodos (N):</label>
+                    <input type="number" id="n_periods" name="n_periods" value="3" min="1" max="50" required>
+                    <small>Ventana para el Promedio Móvil</small>
+                </div>
+
+                <button type="submit" class="primary-btn">Ejecutar Pronóstico</button>
+            </form>
+            
+            <div class="instructions">
+                <p>Seleccione un producto y la cantidad de períodos (N) para calcular el pronóstico y ver las medidas de error.</p>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="dashboard-header glass-panel">
+                <h1>Resultados del Pronóstico</h1>
+                <span id="currentProductBadge" class="badge">Ningún producto seleccionado</span>
+            </header>
+
+            <!-- Metrics Cards -->
+            <section class="metrics-grid">
+                <div class="metric-card glass-panel">
+                    <div class="metric-icon mb-blue">📊</div>
+                    <div class="metric-info">
+                        <h3>MAPE</h3>
+                        <p id="val-mape">--%</p>
+                    </div>
+                </div>
+                <div class="metric-card glass-panel">
+                    <div class="metric-icon mb-purple">📉</div>
+                    <div class="metric-info">
+                        <h3>MAPE Prima</h3>
+                        <p id="val-mapeprima">--%</p>
+                    </div>
+                </div>
+                <div class="metric-card glass-panel">
+                    <div class="metric-icon mb-orange">📐</div>
+                    <div class="metric-info">
+                        <h3>MSE</h3>
+                        <p id="val-mse">--</p>
+                    </div>
+                </div>
+                <div class="metric-card glass-panel">
+                    <div class="metric-icon mb-green">📏</div>
+                    <div class="metric-info">
+                        <h3>RMSE</h3>
+                        <p id="val-rmse">--</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Chart Section -->
+            <section class="chart-section glass-panel">
+                <canvas id="forecastChart"></canvas>
+            </section>
+        </main>
     </div>
-    <p>Pronostico</p>
-</body>
 
+    <!-- Frontend Logic -->
+    <script>
+        let myChart = null;
+
+        document.getElementById('forecastForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const producto = document.getElementById('producto').value;
+            const n_periods = document.getElementById('n_periods').value;
+            
+            if (!producto) {
+                alert('Por favor seleccione un producto.');
+                return;
+            }
+
+            try {
+                // Update badge
+                document.getElementById('currentProductBadge').textContent = `Producto: ${producto} (N=${n_periods})`;
+
+                const response = await fetch('/api/forecast', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ producto: producto, n: n_periods })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Error al calcular el pronóstico');
+                }
+
+                const data = await response.json();
+                
+                // Update metrics
+                document.getElementById('val-mape').textContent = `${data.metrics.MAPE}%`;
+                document.getElementById('val-mapeprima').textContent = `${data.metrics.MAPE_Prima}%`;
+                document.getElementById('val-mse').textContent = data.metrics.MSE;
+                document.getElementById('val-rmse').textContent = data.metrics.RMSE;
+
+                // Update Chart
+                updateChart(data.labels, data.ventas, data.pronostico, producto);
+
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Ocurrió un error al procesar la solicitud.');
+            }
+        });
+
+        function updateChart(labels, ventas, pronostico, productoName) {
+            const ctx = document.getElementById('forecastChart').getContext('2d');
+            
+            // Format arrays replacing empty strings with null so Chart.js breaks the line instead of plotting 0
+            const cleanPronostico = pronostico.map(val => val === "" ? null : val);
+
+            if (myChart) {
+                myChart.destroy();
+            }
+
+            Chart.defaults.color = '#a0aec0';
+            Chart.defaults.font.family = "'Inter', sans-serif";
+
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: `Ventas Reales (${productoName})`,
+                            data: ventas,
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            fill: true,
+                            pointRadius: 3,
+                            pointBackgroundColor: '#3b82f6'
+                        },
+                        {
+                            label: `Pronóstico (Promedio Móvil)`,
+                            data: cleanPronostico,
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            tension: 0.3,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#1e293b',
+                            pointBorderColor: '#f59e0b',
+                            pointBorderWidth: 2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                usePointStyle: true,
+                                padding: 20,
+                                font: {
+                                    size: 13,
+                                    weight: '500'
+                                }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                            titleFont: { size: 14, family: 'Inter' },
+                            bodyFont: { size: 13, family: 'Inter' },
+                            padding: 12,
+                            cornerRadius: 8,
+                            displayColors: true
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)',
+                                drawBorder: false
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false,
+                                drawBorder: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
 </html>
