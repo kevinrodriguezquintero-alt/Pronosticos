@@ -1,47 +1,65 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
+    <!-- METADATOS -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Titulo de la pestaña -->
     <title>Pronósticos de Ventas</title>
+
     <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Fuentes de letra de Google -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
+
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <!-- Chart.js -->
+
+    <!-- Chart.js / Libreria o dependencia externa -->
+    <!--Shift alt a -->
+    <!-- Libreria para la creación de graficos -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
+
 <body>
     <div class="dashboard-container">
         <!-- Sidebar / Controls -->
         <aside class="sidebar glass-panel">
             <div class="logo-container">
-                <h2>📈 ForeCast Pro</h2>
+                <h2>Pronostico de Ventas</h2>
                 <p>Análisis de Promedio Móvil</p>
             </div>
-            
+
+            <!-- FORMULARIO -->
             <form id="forecastForm">
                 <div class="input-group">
                     <label for="producto">Seleccione el Producto:</label>
+                    <!-- DESPLEGABLE DE PRODUCTOS -->
                     <select id="producto" name="producto" required>
                         <option value="" disabled selected>-- Elija un producto --</option>
+                        <!-- CON PYTHON y FLASK HACE UN BUCLE PARA TRAER LOS PRODUCTOS -->
                         {% for prod in productos %}
                         <option value="{{ prod }}">{{ prod }}</option>
                         {% endfor %}
+                        <!-- FIN DEL BUCLE -->
                     </select>
                 </div>
 
                 <div class="input-group">
                     <label for="n_periods">Periodos (N):</label>
+                    <!-- VALOR NUMERICO DE LOS PERIODO -->
                     <input type="number" id="n_periods" name="n_periods" value="3" min="1" max="50" required>
                     <small>Ventana para el Promedio Móvil</small>
                 </div>
 
+                <!-- BOTON DE EJECUCION -->
                 <button type="submit" class="primary-btn">Ejecutar Pronóstico</button>
             </form>
-            
+
             <div class="instructions">
-                <p>Seleccione un producto y la cantidad de períodos (N) para calcular el pronóstico y ver las medidas de error.</p>
+                <p>Seleccione un producto y la cantidad de períodos (N) para calcular el pronóstico y ver las medidas de
+                    error.</p>
             </div>
         </aside>
 
@@ -90,145 +108,186 @@
             </section>
         </main>
     </div>
+</body>
 
-    <!-- Frontend Logic -->
-    <script>
-        let myChart = null;
+<!-- SCRIPTS-->
+<script>
+    let myChart = null;
 
-        document.getElementById('forecastForm').addEventListener('submit', async (e) => {
+    /* OBTENGO LA ETIQUETA FORM  Y ESCUCHO EL EVENTO SUBMIT PARA EJECUTAR ALGO */
+
+
+    /* 
+        Recive el evento o señal, y que debe ejecutar al recibirla
+        addEventListener(evento, funcion)
+
+        python: def nombre_funcion(parametro):
+        javascript: function nombre_funcion(parametro){
+
+        document: ES EL DOCUMENTO HTML
+        getElementById: ES UNA FUNCION QUE PERMITE OBTENER UN ELEMENTO DEL DOCUMENTO HTML POR SU ID
+    */
+    document.getElementById('forecastForm').addEventListener('submit',
+        async function (e) {
+            /* Detiene su comportamiento natural y realiza el de la funcion */
             e.preventDefault();
-            
+
+            /* Variables que guardan el valor de los inputs */
             const producto = document.getElementById('producto').value;
             const n_periods = document.getElementById('n_periods').value;
-            
-            if (!producto) {
-                alert('Por favor seleccione un producto.');
+
+            /* Acaba la funcion si no se selecciona un producto */
+            /* 
+                OPERADORES LOGICOS: 
+                    || : OR
+                    && : AND
+                    ! : NOT
+            */
+            if (!producto || !n_periods) {
+                alert('Por favor seleccione un producto y un numero de periodos.');
                 return;
             }
 
+            /* En un try se pone al pendiente de los throws o de errores */
             try {
-                // Update badge
+                /* Actualiza el badge con el producto y el numero de periodos */
+                /* USAMOS LA INTERPOLACION DE VARIABLES PARA PODER MOSTRAR EL PRODUCTO Y EL NUMERO DE PERIODOS */
                 document.getElementById('currentProductBadge').textContent = `Producto: ${producto} (N=${n_periods})`;
 
+                /* PETICION A LA API */
+                /* await fetch es para hacer peticiones a la API */
+                /* una vez que se hace la peticion, se espera a que se resuelva, y su valor se guarda
+                en la variable response */
+
+                /* Respuesta de la api */
                 const response = await fetch('/api/forecast', {
+                    /* EL METODO */
                     method: 'POST',
+                    /* LE ESTOY DICIENDO QUE LE VOY A ENVIAR UN JSON */
                     headers: {
                         'Content-Type': 'application/json',
                     },
+                    /* LO QUE LE ENVIO */
                     body: JSON.stringify({ producto: producto, n: n_periods })
                 });
 
+                /* Si la respuesta llego bien o con codigo 200, no lanza error */
                 if (!response.ok) {
+                    /* Lanza un error para que se atrape en el catch */
                     throw new Error('Error al calcular el pronóstico');
                 }
 
+                /* Pasa a JSON la respuesta, traducido a javascript */
                 const data = await response.json();
-                
-                // Update metrics
+
+                /* MOSTRAR O ACTUALIZAR LAS METRICAS O CARDS O INDICADORES */
                 document.getElementById('val-mape').textContent = `${data.metrics.MAPE}%`;
                 document.getElementById('val-mapeprima').textContent = `${data.metrics.MAPE_Prima}%`;
                 document.getElementById('val-mse').textContent = data.metrics.MSE;
                 document.getElementById('val-rmse').textContent = data.metrics.RMSE;
 
-                // Update Chart
+                /* MOSTRAR O ACTUALIZAR EL GRAFICO */
                 updateChart(data.labels, data.ventas, data.pronostico, producto);
 
             } catch (error) {
                 console.error('Error:', error);
                 alert('Ocurrió un error al procesar la solicitud.');
             }
-        });
+        }
+    );
 
-        function updateChart(labels, ventas, pronostico, productoName) {
-            const ctx = document.getElementById('forecastChart').getContext('2d');
-            
-            // Format arrays replacing empty strings with null so Chart.js breaks the line instead of plotting 0
-            const cleanPronostico = pronostico.map(val => val === "" ? null : val);
+    /* FUNCION PARA EL GRAFICO CHART JS */
+    function updateChart(labels, ventas, pronostico, productoName) {
+        const ctx = document.getElementById('forecastChart').getContext('2d');
 
-            if (myChart) {
-                myChart.destroy();
-            }
+        // Format arrays replacing empty strings with null so Chart.js breaks the line instead of plotting 0
+        const cleanPronostico = pronostico.map(val => val === "" ? null : val);
 
-            Chart.defaults.color = '#a0aec0';
-            Chart.defaults.font.family = "'Inter', sans-serif";
+        if (myChart) {
+            myChart.destroy();
+        }
 
-            myChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: `Ventas Reales (${productoName})`,
-                            data: ventas,
-                            borderColor: '#3b82f6',
-                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                            borderWidth: 2,
-                            tension: 0.3,
-                            fill: true,
-                            pointRadius: 3,
-                            pointBackgroundColor: '#3b82f6'
-                        },
-                        {
-                            label: `Pronóstico (Promedio Móvil)`,
-                            data: cleanPronostico,
-                            borderColor: '#f59e0b',
-                            backgroundColor: 'transparent',
-                            borderWidth: 2,
-                            borderDash: [5, 5],
-                            tension: 0.3,
-                            pointRadius: 4,
-                            pointBackgroundColor: '#1e293b',
-                            pointBorderColor: '#f59e0b',
-                            pointBorderWidth: 2
-                        }
-                    ]
+        Chart.defaults.color = '#a0aec0';
+        Chart.defaults.font.family = "'Inter', sans-serif";
+
+        /* CONFIGURACION DEL GRAFICO */
+        myChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: `Ventas Reales (${productoName})`,
+                        data: ventas,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: true,
+                        pointRadius: 3,
+                        pointBackgroundColor: '#3b82f6'
+                    },
+                    {
+                        label: `Pronóstico (Promedio Móvil)`,
+                        data: cleanPronostico,
+                        borderColor: '#f59e0b',
+                        backgroundColor: 'transparent',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        tension: 0.3,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#1e293b',
+                        pointBorderColor: '#f59e0b',
+                        pointBorderWidth: 2
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: {
-                        mode: 'index',
-                        intersect: false,
-                    },
-                    plugins: {
-                        legend: {
-                            position: 'top',
-                            labels: {
-                                usePointStyle: true,
-                                padding: 20,
-                                font: {
-                                    size: 13,
-                                    weight: '500'
-                                }
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            usePointStyle: true,
+                            padding: 20,
+                            font: {
+                                size: 13,
+                                weight: '500'
                             }
-                        },
-                        tooltip: {
-                            backgroundColor: 'rgba(15, 23, 42, 0.9)',
-                            titleFont: { size: 14, family: 'Inter' },
-                            bodyFont: { size: 13, family: 'Inter' },
-                            padding: 12,
-                            cornerRadius: 8,
-                            displayColors: true
                         }
                     },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            grid: {
-                                color: 'rgba(255, 255, 255, 0.05)',
-                                drawBorder: false
-                            }
-                        },
-                        x: {
-                            grid: {
-                                display: false,
-                                drawBorder: false
-                            }
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                        titleFont: { size: 14, family: 'Inter' },
+                        bodyFont: { size: 13, family: 'Inter' },
+                        padding: 12,
+                        cornerRadius: 8,
+                        displayColors: true
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.05)',
+                            drawBorder: false
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false,
+                            drawBorder: false
                         }
                     }
                 }
-            });
-        }
-    </script>
-</body>
+            }
+        });
+    }
+</script>
+
 </html>

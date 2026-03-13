@@ -2,8 +2,12 @@ from flask import Flask, render_template, request, jsonify
 import pandas as pd
 import numpy as np
 
+""" SERVIDOR / API """
 app = Flask(__name__)
 
+""" FUNCIONES DE PYTHON """
+
+""" Esta funcion carga el archivo .csv para su lectura en las funciones (def) """
 def load_data():
     try:
         return pd.read_csv("venta_historicas.csv")
@@ -45,18 +49,27 @@ def pronosticar(datos, columna, N):
         }
     }
 
-@app.route("/")
+""" ENDPOINTS DE LA API """
+
+""" METHOD: GET """
+@app.route("/", methods=["GET"])
 def index():
     datos = load_data()
+    """ ENCABEZADOS DEL CSV """
     productos = datos.columns.tolist() if datos is not None else []
+
+    """ RENDERIZADO DEL HTML y le pasa los productos como parametro """
     return render_template("Pronostico.html", productos=productos)
 
+""" METHOD: POST """
 @app.route("/api/forecast", methods=["POST"])
 def forecast():
+    """ CARGA EL CSV Y SUS DATOS """
     datos = load_data()
     if datos is None:
         return jsonify({"error": "No se pudo cargar el archivo CSV"}), 500
         
+    """ RECIBO LA INFORMACION DEL HTML, lo que viene en el body del fetch en json """
     data = request.json
     N = int(data.get("n", 3))
     producto = data.get("producto")
@@ -64,11 +77,14 @@ def forecast():
     if not producto:
         return jsonify({"error": "Producto no especificado"}), 400
         
+    """ Ejcuta la funcion pronosticar y guarda el resultado """
     resultado = pronosticar(datos, producto, N)
     if resultado is None:
         return jsonify({"error": "Producto no encontrado"}), 404
         
+    """ RETORNA EL RESULTADO EN JSON """
     return jsonify(resultado)
 
+""" INICIA EL SERVIDOR """
 if __name__ == "__main__":
     app.run(debug=True)
