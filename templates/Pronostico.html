@@ -22,91 +22,206 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <link rel="shortcut icon" href="{{ url_for('static', filename='assets/grafico-de-lineas.png') }}" type="image/png">
+
+    <style>
+        .product-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.4rem;
+            padding: 0.5rem;
+            flex-wrap: nowrap;
+            justify-content: flex-start;
+        }
+
+        .tab-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: none;
+            color: #a0aec0;
+            padding: 0.75rem 1.25rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+            flex: 1;
+            text-align: center;
+        }
+
+        .tab-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        .tab-btn.active {
+            background: #1e293b;
+            color: #fff;
+            box-shadow: 0 0 0 2px #3b82f6;
+        }
+
+        .active-product-content {
+            padding: 0.8rem 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            flex-grow: 1;
+            height: calc(100vh - 150px);
+            overflow: hidden;
+        }
+
+        .metrics-grid-compact {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+        }
+
+        .metric-card-mini {
+            background: rgba(255, 255, 255, 0.03);
+            padding: 0.6rem 1rem;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .metric-card-mini span {
+            font-size: 0.8rem;
+            color: #a0aec0;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-card-mini strong {
+            font-size: 1.25rem;
+            color: #fff;
+        }
+
+        .chart-container-main {
+            flex-grow: 1;
+            position: relative;
+            min-height: 300px;
+        }
+
+        .badge-n {
+            background: #1e293b;
+            color: #3b82f6;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            border: 1px solid #3b82f6;
+        }
+
+        .header-with-badge {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .badge-group {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .badge-method {
+            background: #1e293b;
+            color: #a78bfa;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            border: 1px solid #a78bfa;
+        }
+
+        .badge-future {
+            background: #1e293b;
+            color: #34d399;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            border: 1px solid #34d399;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 4rem;
+            color: #a0aec0;
+        }
+    </style>
 </head>
 
 <body>
     <div class="dashboard-container">
         <!-- Sidebar / Controls -->
         <aside class="sidebar glass-panel">
-            <div class="logo-container">
+            <div class="sidebar-header">
                 <h2>Pronostico de Ventas</h2>
-                <p>Análisis de Promedio Móvil</p>
+            </div>
+
+            <!-- UPLOAD SECTION -->
+            <div class="input-group glass-panel" style="padding: 0.75rem; margin-bottom: 1rem;">
+                <label style="font-size: 0.85rem;">Historial de Datos:</label>
+                <span id="fileNameDisplay" style="font-size: 0.8rem; color: #a0aec0; display: block; margin: 0.4rem 0;">Ningún archivo cargado</span>
+                
+                <div class="custom-file-upload">
+                    <input type="file" id="csv_file" accept=".csv" style="display: none;">
+                    <button type="button" id="customFileBtn" class="primary-btn" style="width: 100%; padding: 0.5rem; font-size: 0.85rem; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); box-shadow: none;">Seleccionar archivo</button>
+                </div>
+                
+                <button type="button" id="uploadBtn" class="primary-btn" disabled style="margin-top: 0.75rem; padding: 0.5rem; font-size: 0.9rem; opacity: 0.5; cursor: not-allowed;">Cargar Archivo</button>
+                <div id="uploadStatus" style="font-size: 0.75rem; margin-top: 0.3rem; color: #a0aec0;"></div>
             </div>
 
             <!-- FORMULARIO -->
             <form id="forecastForm">
                 <div class="input-group">
-                    <label for="producto">Seleccione el Producto:</label>
-                    <!-- DESPLEGABLE DE PRODUCTOS -->
-                    <select id="producto" name="producto" required>
-                        <option value="" disabled selected>-- Elija un producto --</option>
-                        <!-- CON PYTHON y FLASK HACE UN BUCLE PARA TRAER LOS PRODUCTOS -->
-                        {% for prod in productos %}
-                        <option value="{{ prod }}">{{ prod }}</option>
-                        {% endfor %}
-                        <!-- FIN DEL BUCLE -->
+                    <label for="forecast_type">Metodología:</label>
+                    <select id="forecast_type" name="forecast_type">
+                        <option value="promedio_movil" selected>Promedio Móvil</option>
+                        <option value="suavizacion_exponencial">Suavización Exponencial</option>
+                        <option value="otro">Prophet</option>
                     </select>
                 </div>
 
-                <div class="input-group">
+                <div class="input-group" id="nPeriodsGroup">
                     <label for="n_periods">Periodos (N):</label>
-                    <!-- VALOR NUMERICO DE LOS PERIODO -->
                     <input type="number" id="n_periods" name="n_periods" value="3" min="1" max="50" required>
                     <small>Ventana para el Promedio Móvil</small>
+                </div>
+
+                <div class="input-group" id="futurePeriodsGroup">
+                    <label for="future_periods">Meses a Futuro:</label>
+                    <input type="number" id="future_periods" name="future_periods" value="1" min="1" max="12" required>
+                    <small>Proyección de meses adelante</small>
                 </div>
 
                 <!-- BOTON DE EJECUCION -->
                 <button type="submit" class="primary-btn">Ejecutar Pronóstico</button>
             </form>
 
-            <div class="instructions">
-                <p>Seleccione un producto y la cantidad de períodos (N) para calcular el pronóstico y ver las medidas de
-                    error.</p>
-            </div>
         </aside>
 
         <!-- Main Content -->
         <main class="main-content">
-            <header class="dashboard-header glass-panel">
-                <h1>Resultados del Pronóstico</h1>
-                <span id="currentProductBadge" class="badge">Ningún producto seleccionado</span>
-            </header>
+            <!-- Product Tabs -->
+            <nav id="productTabs" class="product-tabs glass-panel">
+                <!-- Tabs will be injected here -->
+            </nav>
 
-            <!-- Metrics Cards -->
-            <section class="metrics-grid">
-                <div class="metric-card glass-panel">
-                    <div class="metric-icon mb-blue">📊</div>
-                    <div class="metric-info">
-                        <h3>MAPE</h3>
-                        <p id="val-mape">--%</p>
-                    </div>
+            <!-- Active Product Content -->
+            <section id="activeProductContent" class="active-product-content glass-panel">
+                <div class="empty-state">
+                    <p id="emptyMessage">
+                        {% if productos %}
+                            Haga clic en el botón para generar los pronósticos de todos los productos.
+                        {% else %}
+                            Suba un archivo CSV histórico para comenzar el análisis.
+                        {% endif %}
+                    </p>
                 </div>
-                <div class="metric-card glass-panel">
-                    <div class="metric-icon mb-purple">📉</div>
-                    <div class="metric-info">
-                        <h3>MAPE Prima</h3>
-                        <p id="val-mapeprima">--%</p>
-                    </div>
-                </div>
-                <div class="metric-card glass-panel">
-                    <div class="metric-icon mb-orange">📐</div>
-                    <div class="metric-info">
-                        <h3>MSE</h3>
-                        <p id="val-mse">--</p>
-                    </div>
-                </div>
-                <div class="metric-card glass-panel">
-                    <div class="metric-icon mb-green">📏</div>
-                    <div class="metric-info">
-                        <h3>RMSE</h3>
-                        <p id="val-rmse">--</p>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Chart Section -->
-            <section class="chart-section glass-panel">
-                <canvas id="forecastChart"></canvas>
             </section>
         </main>
     </div>
@@ -114,178 +229,272 @@
 
 <!-- SCRIPTS-->
 <script>
-    let myChart = null;
+    /* Store Chart instances and Data */
+    let activeChart = null;
+    let cachedData = null;
 
-    /* OBTENGO LA ETIQUETA FORM  Y ESCUCHO EL EVENTO SUBMIT PARA EJECUTAR ALGO */
+    /* Initialize Uploaded File Display */
+    window.addEventListener('load', () => {
+        const lastFile = localStorage.getItem('lastUploadedCSV');
+        if (lastFile) {
+            const display = document.getElementById('fileNameDisplay');
+            display.textContent = `Archivo actual: ${lastFile}`;
+            display.style.color = '#3b82f6';
+        }
+    });
 
+    /* Handle dynamic input visibility */
+    function updateFieldVisibility() {
+        const typeSelect = document.getElementById('forecast_type');
+        const nGroup = document.getElementById('nPeriodsGroup');
+        const futureGroup = document.getElementById('futurePeriodsGroup');
+        
+        if (typeSelect.value === 'promedio_movil') {
+            nGroup.style.display = 'block';
+            futureGroup.style.display = 'none';
+            document.getElementById('future_periods').value = 1; 
+        } else {
+            nGroup.style.display = 'none';
+            futureGroup.style.display = 'block';
+        }
+    }
 
-    /* 
-        Recive el evento o señal, y que debe ejecutar al recibirla
-        addEventListener(evento, funcion)
+    document.getElementById('forecast_type').addEventListener('change', updateFieldVisibility);
+    
+    /* Initialize visibility on load */
+    window.addEventListener('load', updateFieldVisibility);
 
-        python: def nombre_funcion(parametro):
-        javascript: function nombre_funcion(parametro){
+    /* Custom File Picker Logic */
+    document.getElementById('customFileBtn').addEventListener('click', () => {
+        document.getElementById('csv_file').click();
+    });
 
-        document: ES EL DOCUMENTO HTML
-        getElementById: ES UNA FUNCION QUE PERMITE OBTENER UN ELEMENTO DEL DOCUMENTO HTML POR SU ID
-    */
+    /* Enable/Disable Upload Button and Show File Name */
+    document.getElementById('csv_file').addEventListener('change', function() {
+        const btn = document.getElementById('uploadBtn');
+        const fileNameDisplay = document.getElementById('fileNameDisplay');
+        
+        if (this.files.length > 0) {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            btn.style.cursor = 'pointer';
+            fileNameDisplay.textContent = `Seleccionado: ${this.files[0].name}`;
+            fileNameDisplay.style.color = '#f59e0b';
+        } else {
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+            btn.style.cursor = 'not-allowed';
+            const lastFile = localStorage.getItem('lastUploadedCSV');
+            fileNameDisplay.textContent = lastFile ? `Archivo actual: ${lastFile}` : 'Ningún archivo cargado';
+            fileNameDisplay.style.color = lastFile ? '#3b82f6' : '#a0aec0';
+        }
+    });
+
+    /* Handle File Upload */
+    document.getElementById('uploadBtn').addEventListener('click', async function() {
+        const fileInput = document.getElementById('csv_file');
+        const status = document.getElementById('uploadStatus');
+        const fileName = fileInput.files[0].name;
+        
+        if (fileInput.files.length === 0) {
+            alert('Por favor seleccione un archivo CSV.');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+
+        try {
+            status.textContent = 'Subiendo...';
+            const response = await fetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) throw new Error('Error al subir el archivo');
+
+            /* Save filename to persistence before reload */
+            localStorage.setItem('lastUploadedCSV', fileName);
+
+            status.textContent = '¡Archivo cargado con éxito!';
+            status.style.color = '#4ade80';
+            
+            /* Refresh the page immediately */
+            location.reload();
+
+        } catch (error) {
+            console.error('Error:', error);
+            status.textContent = 'Error al subir archivo.';
+            status.style.color = '#f87171';
+        }
+    });
+
     document.getElementById('forecastForm').addEventListener('submit',
         async function (e) {
-            /* Detiene su comportamiento natural y realiza el de la funcion */
             e.preventDefault();
-
-            /* Variables que guardan el valor de los inputs */
-            const producto = document.getElementById('producto').value;
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            
             const n_periods = document.getElementById('n_periods').value;
+            const future_periods = document.getElementById('future_periods').value;
+            const forecast_type = document.getElementById('forecast_type').value;
 
-            /* Acaba la funcion si no se selecciona un producto */
-            /* 
-                OPERADORES LOGICOS: 
-                    || : OR
-                    && : AND
-                    ! : NOT
-            */
-            if (!producto || !n_periods) {
-                alert('Por favor seleccione un producto y un numero de periodos.');
-                return;
-            }
-
-            /* En un try se pone al pendiente de los throws o de errores */
             try {
-                /* Actualiza el badge con el producto y el numero de periodos */
-                /* USAMOS LA INTERPOLACION DE VARIABLES PARA PODER MOSTRAR EL PRODUCTO Y EL NUMERO DE PERIODOS */
-                document.getElementById('currentProductBadge').textContent = `Producto: ${producto} (N=${n_periods})`;
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Procesando...';
 
-                /* PETICION A LA API */
-                /* await fetch es para hacer peticiones a la API */
-                /* una vez que se hace la peticion, se espera a que se resuelva, y su valor se guarda
-                en la variable response */
-
-                /* Respuesta de la api */
                 const response = await fetch('/api/forecast', {
-                    /* EL METODO */
                     method: 'POST',
-                    /* LE ESTOY DICIENDO QUE LE VOY A ENVIAR UN JSON */
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    /* LO QUE LE ENVIO */
-                    body: JSON.stringify({ producto: producto, n: n_periods })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        n: n_periods,
+                        future_steps: future_periods,
+                        method: forecast_type
+                    })
                 });
 
-                /* Si la respuesta llego bien o con codigo 200, no lanza error */
-                if (!response.ok) {
-                    /* Lanza un error para que se atrape en el catch */
-                    throw new Error('Error al calcular el pronóstico');
-                }
+                if (!response.ok) throw new Error('Error al calcular el pronóstico');
 
-                /* Pasa a JSON la respuesta, traducido a javascript */
-                const data = await response.json();
-
-                /* MOSTRAR O ACTUALIZAR LAS METRICAS O CARDS O INDICADORES */
-                document.getElementById('val-mape').textContent = `${data.metrics.MAPE}%`;
-                document.getElementById('val-mapeprima').textContent = `${data.metrics.MAPE_Prima}%`;
-                document.getElementById('val-mse').textContent = data.metrics.MSE;
-                document.getElementById('val-rmse').textContent = data.metrics.RMSE;
-
-                /* MOSTRAR O ACTUALIZAR EL GRAFICO */
-                updateChart(data.labels, data.ventas, data.pronostico, producto);
+                cachedData = await response.json();
+                renderTabs(cachedData);
+                /* Show first product by default */
+                const firstProduct = Object.keys(cachedData)[0];
+                showProduct(firstProduct);
 
             } catch (error) {
                 console.error('Error:', error);
                 alert('Ocurrió un error al procesar la solicitud.');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
             }
         }
     );
 
-    /* FUNCION PARA EL GRAFICO CHART JS */
-    function updateChart(labels, ventas, pronostico, productoName) {
-        const ctx = document.getElementById('forecastChart').getContext('2d');
-
-        // Format arrays replacing empty strings with null so Chart.js breaks the line instead of plotting 0
-        const cleanPronostico = pronostico.map(val => val === "" ? null : val);
-
-        if (myChart) {
-            myChart.destroy();
+    function renderTabs(allData) {
+        const tabsNav = document.getElementById('productTabs');
+        tabsNav.innerHTML = '';
+        
+        for (const producto of Object.keys(allData)) {
+            const btn = document.createElement('button');
+            btn.className = 'tab-btn';
+            btn.textContent = producto;
+            btn.onclick = () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                showProduct(producto);
+            };
+            tabsNav.appendChild(btn);
         }
+        /* Set first tab as active */
+        if (tabsNav.firstChild) tabsNav.firstChild.classList.add('active');
+    }
+
+    function showProduct(producto) {
+        const data = cachedData[producto];
+        const container = document.getElementById('activeProductContent');
+        const methodValue = document.getElementById('forecast_type').value;
+        const nValue = document.getElementById('n_periods').value;
+        const futureValue = document.getElementById('future_periods').value;
+        const methodLabels = {
+            'promedio_movil': 'Promedio Móvil',
+            'suavizacion_exponencial': 'Suavización Exponencial',
+            'otro': 'Prophet'
+        };
+        const methodLabel = methodLabels[methodValue] || methodValue;
+        const futureBadge = methodValue !== 'promedio_movil'
+            ? `<span class="badge-future">📅 +${futureValue} mes${futureValue > 1 ? 'es' : ''}</span>`
+            : '';
+        const nBadge = methodValue === 'promedio_movil'
+            ? `<span class="badge-n">N=${nValue}</span>`
+            : '';
+        container.innerHTML = `
+            <div class="header-with-badge">
+                <div class="badge-group">
+                    <span class="badge-method">📊 ${methodLabel}</span>
+                    ${futureBadge}
+                </div>
+                ${nBadge}
+            </div>
+            
+            <div class="metrics-grid-compact">
+                <div class="metric-card-mini">
+                    <span>MAPE</span>
+                    <strong>${data.metrics.MAPE}%</strong>
+                </div>
+                <div class="metric-card-mini">
+                    <span>MAPE'</span>
+                    <strong>${data.metrics.MAPE_Prima}%</strong>
+                </div>
+                <div class="metric-card-mini">
+                    <span>MSE</span>
+                    <strong>${data.metrics.MSE}</strong>
+                </div>
+                <div class="metric-card-mini">
+                    <span>RMSE</span>
+                    <strong>${data.metrics.RMSE}</strong>
+                </div>
+            </div>
+
+            <div class="chart-container-main">
+                <canvas id="mainForecastChart"></canvas>
+            </div>
+        `;
+
+        renderProductChart(data);
+    }
+
+    function renderProductChart(data) {
+        const ctx = document.getElementById('mainForecastChart').getContext('2d');
+        
+        const cleanVentas = data.ventas.map(val => val === "" ? null : val);
+        const cleanPronostico = data.pronostico.map(val => val === "" ? null : val);
+
+        if (activeChart) activeChart.destroy();
 
         Chart.defaults.color = '#a0aec0';
         Chart.defaults.font.family = "'Inter', sans-serif";
 
-        /* CONFIGURACION DEL GRAFICO */
-        myChart = new Chart(ctx, {
+        activeChart = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: labels,
+                labels: data.labels,
                 datasets: [
                     {
-                        label: `Ventas Reales (${productoName})`,
-                        data: ventas,
+                        label: `Ventas Reales`,
+                        data: cleanVentas,
                         borderColor: '#3b82f6',
                         backgroundColor: 'rgba(59, 130, 246, 0.1)',
                         borderWidth: 2,
                         tension: 0.3,
                         fill: true,
-                        pointRadius: 3,
-                        pointBackgroundColor: '#3b82f6'
+                        pointRadius: 3
                     },
                     {
-                        label: `Pronóstico (Promedio Móvil)`,
+                        label: `Pronóstico`,
                         data: cleanPronostico,
                         borderColor: '#f59e0b',
                         backgroundColor: 'transparent',
                         borderWidth: 2,
                         borderDash: [5, 5],
                         tension: 0.3,
-                        pointRadius: 4,
-                        pointBackgroundColor: '#1e293b',
-                        pointBorderColor: '#f59e0b',
-                        pointBorderWidth: 2
+                        pointRadius: 4
                     }
                 ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                interaction: {
-                    mode: 'index',
-                    intersect: false,
-                },
                 plugins: {
                     legend: {
                         position: 'top',
-                        labels: {
-                            usePointStyle: true,
-                            padding: 20,
-                            font: {
-                                size: 13,
-                                weight: '500'
-                            }
-                        }
+                        labels: { usePointStyle: true, padding: 20 }
                     },
-                    tooltip: {
-                        backgroundColor: 'rgba(15, 23, 42, 0.9)',
-                        titleFont: { size: 14, family: 'Inter' },
-                        bodyFont: { size: 13, family: 'Inter' },
-                        padding: 12,
-                        cornerRadius: 8,
-                        displayColors: true
-                    }
+                    tooltip: { mode: 'index', intersect: false }
                 },
                 scales: {
-                    y: {
-                        beginAtZero: true,
-                        grid: {
-                            color: 'rgba(255, 255, 255, 0.05)',
-                            drawBorder: false
-                        }
-                    },
-                    x: {
-                        grid: {
-                            display: false,
-                            drawBorder: false
-                        }
-                    }
+                    y: { beginAtZero: true, grid: { color: 'rgba(255, 255, 255, 0.05)' } },
+                    x: { grid: { display: false } }
                 }
             }
         });
